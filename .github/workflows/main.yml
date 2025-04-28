@@ -9,35 +9,46 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      NVM_DIR: ${{ runner.temp }}/.nvm
 
     steps:
-      # 1. Manually check out your repo
+      # 1. Checkout your code
       - name: Checkout code
         run: |
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $GITHUB_WORKSPACE
           cd $GITHUB_WORKSPACE
 
-      # 2. Install Node.js 17 via NodeSource (ubuntu-latest comes with curl and sudo)
-      - name: Install Node.js 17
+      # 2. Install nvm & Node.js 17
+      - name: Install nvm and Node.js 17
         run: |
-          curl -fsSL https://deb.nodesource.com/setup_17.x | sudo -E bash -
-          sudo apt-get update
-          sudo apt-get install -y nodejs
+          # fetch and install nvm into $NVM_DIR
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh \
+            | bash
+          # load nvm in this shell
+          source $NVM_DIR/nvm.sh
+          # install and use Node 17
+          nvm install 17
+          nvm use 17
+          echo "Node version: $(node -v)"
+          echo "npm version:  $(npm -v)"
 
-      # 3. Install your npm deps and run tests
+      # 3. Install deps & run tests
       - name: Install deps & test
         run: |
           cd $GITHUB_WORKSPACE
           npm ci
           npm test
 
-      # 4. Log in to your Docker registry
+      # 4. Login to Docker registry
       - name: Docker login
         run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} \
-            --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          echo "${{ secrets.DOCKER_PASSWORD }}" \
+            | docker login ${{ secrets.DOCKER_REGISTRY }} \
+              --username ${{ secrets.DOCKER_USERNAME }} \
+              --password-stdin
 
-      # 5. Build & push your image with two tags
+      # 5. Build & push your Docker image
       - name: Build & push Docker image
         run: |
           cd $GITHUB_WORKSPACE
