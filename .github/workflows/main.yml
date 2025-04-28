@@ -1,44 +1,55 @@
-# .github/workflows/ci-cd.yml
 name: Build & Deploy Frontend
 
-# Trigger on pushes to main
 on:
   push:
     branches: [ main ]
 
 jobs:
   build-and-deploy:
-    # Use your self-hosted Swarm runner
+    # must match your self-hosted runner’s labels
     runs-on: [ self-hosted, linux, docker-swarm ]
 
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-
-      - name: Log in to Docker registry
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | \
-             docker login ${{ secrets.DOCKER_REGISTRY }} \
-               -u "${{ secrets.DOCKER_USER }}" --password-stdin
-
-      - name: Build & tag Docker image
+      # 1. Clone your repo (GITHUB_TOKEN is auto-provided)
+      - name: Checkout code
         run: |
-          # Use your Dockerfile at the repo root
-          docker build \
-            -t ${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }} \
-            -f Dockerfile \
-            .
+          git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/Zhantoree/react-bookstore.git .
+          git checkout ${{ github.sha }}
 
-      - name: Push image
-        run: docker push ${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }}
+      # 2. Install & build
+      - name: Install dependencies
+        run: npm ci
 
+      - name: Build production bundle
+        run: npm run build
+
+      # 3. Log in to your registry
+      - name: Docker login
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" \
+            | docker login ${{ secrets.DOCKER_REGISTRY }} \
+                -u "${{ secrets.DOCKER_USER }}" --password-stdin
+
+      # 4. Build & push your image
+      - name: Build & push image
+        run: |
+          IMAGE=${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }}
+          docker build -f Dockerfile -t $IMAGE .
+          docker push $IMAGE
+
+      # 5. Prepare SSH key on runner
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      # 6. Update Swarm service
       - name: Deploy to Docker Swarm
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            # Update the frontend service in your Swarm
-            docker service update \
-              --image ${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }} \
-              ${{ secrets.STACK_NAME }}_frontend
+        run: |
+          IMAGE=${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }}
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "docker service update \
+               --image $IMAGE \
+               ${{ secrets.STACK_NAME }}_frontend"
