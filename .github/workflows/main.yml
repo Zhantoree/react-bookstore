@@ -1,0 +1,44 @@
+# .github/workflows/ci-cd.yml
+name: Build & Deploy Frontend
+
+# Trigger on pushes to main
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    # Use your self-hosted Swarm runner
+    runs-on: [ self-hosted, linux, docker-swarm ]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | \
+             docker login ${{ secrets.DOCKER_REGISTRY }} \
+               -u "${{ secrets.DOCKER_USER }}" --password-stdin
+
+      - name: Build & tag Docker image
+        run: |
+          # Use your Dockerfile at the repo root
+          docker build \
+            -t ${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }} \
+            -f Dockerfile \
+            .
+
+      - name: Push image
+        run: docker push ${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }}
+
+      - name: Deploy to Docker Swarm
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            # Update the frontend service in your Swarm
+            docker service update \
+              --image ${{ secrets.DOCKER_REGISTRY }}/frontend:${{ github.sha }} \
+              ${{ secrets.STACK_NAME }}_frontend
