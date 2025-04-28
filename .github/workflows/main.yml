@@ -22,8 +22,7 @@ jobs:
         run: |
           export NVM_DIR="$RUNNER_TEMP/.nvm"
           mkdir -p "$NVM_DIR"
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh \
-            | bash
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
           source "$NVM_DIR/nvm.sh"
           nvm install 22
           nvm use 22
@@ -61,22 +60,20 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Install SSH client and key tools
+      - name: Install SSH client
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssh-client ssh-keygen
+          sudo apt-get install -y openssh-client
 
       - name: Setup SSH key and agent
         run: |
-          # write the key and lock down permissions
           mkdir -p ~/.ssh
           echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-          # convert to PEM format if needed (fixes libcrypto errors)
+          # convert key to PEM for compatibility
           ssh-keygen -p -N "" -m PEM -f ~/.ssh/id_rsa
 
-          # start the agent and add the key
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_rsa
 
@@ -85,13 +82,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no \
               -p ${{ secrets.SWARM_SSH_PORT }} \
               ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'EOF'
-            # ensure the manager can pull your image
             echo "${{ secrets.DOCKER_PASSWORD }}" \
               | docker login ${{ secrets.DOCKER_REGISTRY }} \
                   --username ${{ secrets.DOCKER_USERNAME }} \
                   --password-stdin
 
-            # redeploy the stack from the host’s compose file
             docker stack deploy \
               -c /home/${{ secrets.SWARM_USER }}/docker-compose.yml \
               frontend-stack \
