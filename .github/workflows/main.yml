@@ -1,6 +1,5 @@
 name: CI
 
-# trigger on any push to main (and PRs targeting main)
 on:
   push:
     branches: [ main ]
@@ -12,37 +11,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Grab your code
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # 1. Manually check out your repo
+      - name: Checkout code
+        run: |
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $GITHUB_WORKSPACE
+          cd $GITHUB_WORKSPACE
 
-      # 2. Set up Node.js 17
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '17'
+      # 2. Install Node.js 17 via NodeSource (ubuntu-latest comes with curl and sudo)
+      - name: Install Node.js 17
+        run: |
+          curl -fsSL https://deb.nodesource.com/setup_17.x | sudo -E bash -
+          sudo apt-get update
+          sudo apt-get install -y nodejs
 
-      # 3. Install dependencies & run your tests
-      - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test
+      # 3. Install your npm deps and run tests
+      - name: Install deps & test
+        run: |
+          cd $GITHUB_WORKSPACE
+          npm ci
+          npm test
 
       # 4. Log in to your Docker registry
       - name: Docker login
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ secrets.DOCKER_REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} \
+            --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-      # 5. Build your image (uses your Dockerfile) and push it
+      # 5. Build & push your image with two tags
       - name: Build & push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/frontend:latest
-            ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/frontend:${{ github.sha }}
+        run: |
+          cd $GITHUB_WORKSPACE
+          IMAGE="${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/frontend"
+          docker build -t "$IMAGE:latest" .
+          docker tag "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
