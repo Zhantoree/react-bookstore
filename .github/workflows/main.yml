@@ -17,15 +17,16 @@ jobs:
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $GITHUB_WORKSPACE
           cd $GITHUB_WORKSPACE
 
-      # 2. Install nvm & Node.js 18 LTS
-      - name: Install nvm and Node.js LTS
+      # 2. Install nvm & Node.js 22 LTS
+      - name: Install nvm and Node.js v22
         run: |
           export NVM_DIR="$RUNNER_TEMP/.nvm"
           mkdir -p "$NVM_DIR"
           curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
           source "$NVM_DIR/nvm.sh"
-          nvm install --lts
-          nvm use --lts
+          # Install Node 22 LTS
+          nvm install 22
+          nvm use 22
           echo "Node version: $(node -v)"
           echo "npm version:  $(npm -v)"
 
@@ -35,7 +36,7 @@ jobs:
           cd $GITHUB_WORKSPACE
           npm ci
 
-      # 4. Run tests if you have a test script
+      # 4. Run tests if you have them
       - name: Run tests (if present)
         run: |
           cd $GITHUB_WORKSPACE
