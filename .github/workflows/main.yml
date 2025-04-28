@@ -15,7 +15,9 @@ jobs:
     steps:
       - name: Checkout code
         run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $GITHUB_WORKSPACE
+          git clone \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git \
+            $GITHUB_WORKSPACE
           cd $GITHUB_WORKSPACE
 
       - name: Install nvm & Node.js v22
@@ -64,17 +66,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y openssh-client
 
-      - name: Setup SSH key and agent
+      - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
-          printf "%s" "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/id_rsa
+          # strip CRLF and write key
+          printf "%s" "${{ secrets.SWARM_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_rsa
 
       - name: Deploy to Docker Swarm
         run: |
           ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/id_rsa \
               -p ${{ secrets.SWARM_SSH_PORT }} \
               ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'EOF'
             echo "${{ secrets.DOCKER_PASSWORD }}" \
