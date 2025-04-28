@@ -1,6 +1,5 @@
 name: CI
 
-# ← this is your trigger section; don't remove or indent under jobs!
 on:
   push:
     branches:
@@ -68,9 +67,7 @@ jobs:
       - name: Setup SSH key and agent
         run: |
           mkdir -p ~/.ssh
-          cat << 'EOK' > ~/.ssh/id_rsa
-${{ secrets.SWARM_SSH_KEY }}
-EOK
+          printf "%s" "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_rsa
