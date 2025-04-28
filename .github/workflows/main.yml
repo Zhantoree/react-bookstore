@@ -17,33 +17,31 @@ jobs:
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $GITHUB_WORKSPACE
           cd $GITHUB_WORKSPACE
 
-      # 2. Install nvm & Node.js 17 using the runner's temp directory
-      - name: Install nvm and Node.js 17
+      # 2. Install nvm & Node.js 18 LTS
+      - name: Install nvm and Node.js LTS
         run: |
-          # Set NVM_DIR inside the runner's temp folder
           export NVM_DIR="$RUNNER_TEMP/.nvm"
           mkdir -p "$NVM_DIR"
-
-          # Install nvm
           curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
-
-          # Load nvm and install Node 17
           source "$NVM_DIR/nvm.sh"
-          nvm install 17
-          nvm use 17
-
-          # Verify
+          nvm install --lts
+          nvm use --lts
           echo "Node version: $(node -v)"
           echo "npm version:  $(npm -v)"
 
-      # 3. Install dependencies & run tests
-      - name: Install deps & test
+      # 3. Install deps
+      - name: Install dependencies
         run: |
           cd $GITHUB_WORKSPACE
           npm ci
-          npm test
 
-      # 4. Docker login
+      # 4. Run tests if you have a test script
+      - name: Run tests (if present)
+        run: |
+          cd $GITHUB_WORKSPACE
+          npm test --if-present
+
+      # 5. Docker login
       - name: Docker login
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" \
@@ -51,7 +49,7 @@ jobs:
               --username ${{ secrets.DOCKER_USERNAME }} \
               --password-stdin
 
-      # 5. Build & push Docker image
+      # 6. Build & push Docker image
       - name: Build & push Docker image
         run: |
           cd $GITHUB_WORKSPACE
