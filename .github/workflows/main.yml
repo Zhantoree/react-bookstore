@@ -11,46 +11,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout your repo
       - name: Checkout code
         run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $GITHUB_WORKSPACE
+          git clone \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git \
+            $GITHUB_WORKSPACE
           cd $GITHUB_WORKSPACE
 
-      # 2. Install nvm & Node.js 22 LTS
-      - name: Install nvm and Node.js v22
+      - name: Install nvm & Node.js v22
         run: |
           export NVM_DIR="$RUNNER_TEMP/.nvm"
           mkdir -p "$NVM_DIR"
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh \
+            | bash
           source "$NVM_DIR/nvm.sh"
-          # Install Node 22 LTS
           nvm install 22
           nvm use 22
-          echo "Node version: $(node -v)"
-          echo "npm version:  $(npm -v)"
+          node -v && npm -v
 
-      # 3. Install deps
       - name: Install dependencies
         run: |
           cd $GITHUB_WORKSPACE
           npm ci
 
-      # 4. Run tests if you have them
       - name: Run tests (if present)
         run: |
           cd $GITHUB_WORKSPACE
           npm test --if-present
 
-      # 5. Docker login
       - name: Docker login
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" \
             | docker login ${{ secrets.DOCKER_REGISTRY }} \
-              --username ${{ secrets.DOCKER_USERNAME }} \
-              --password-stdin
+                --username ${{ secrets.DOCKER_USERNAME }} \
+                --password-stdin
 
-      # 6. Build & push Docker image
       - name: Build & push Docker image
         run: |
           cd $GITHUB_WORKSPACE
@@ -59,3 +54,37 @@ jobs:
           docker tag "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
           docker push "$IMAGE:${{ github.sha }}"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Deploy to Docker Swarm
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/id_rsa \
+              -p ${{ secrets.SWARM_SSH_PORT }} \
+              ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'ENDSSH'
+            # Log in on the manager so it can pull the image
+            echo "${{ secrets.DOCKER_PASSWORD }}" \
+              | docker login ${{ secrets.DOCKER_REGISTRY }} \
+                  --username ${{ secrets.DOCKER_USERNAME }} \
+                  --password-stdin
+
+            # Redeploy the stack from the remote compose file
+            docker stack deploy \
+              -c /home/${{ secrets.SWARM_USER }}/docker-compose.yml \
+              frontend-stack \
+              --with-registry-auth
+          ENDSSH
