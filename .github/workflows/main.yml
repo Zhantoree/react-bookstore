@@ -61,30 +61,39 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Install SSH client
-        run: sudo apt-get update && sudo apt-get install -y openssh-client
-
-      - name: Setup SSH key
+      - name: Install SSH client and key tools
         run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-client ssh-keygen
+
+      - name: Setup SSH key and agent
+        run: |
+          # write the key and lock down permissions
           mkdir -p ~/.ssh
           echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
+          # convert to PEM format if needed (fixes libcrypto errors)
+          ssh-keygen -p -N "" -m PEM -f ~/.ssh/id_rsa
+
+          # start the agent and add the key
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
       - name: Deploy to Docker Swarm
         run: |
           ssh -o StrictHostKeyChecking=no \
-              -i ~/.ssh/id_rsa \
               -p ${{ secrets.SWARM_SSH_PORT }} \
-              ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'ENDSSH'
-            # Log in on the manager so it can pull the image
+              ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'EOF'
+            # ensure the manager can pull your image
             echo "${{ secrets.DOCKER_PASSWORD }}" \
               | docker login ${{ secrets.DOCKER_REGISTRY }} \
                   --username ${{ secrets.DOCKER_USERNAME }} \
                   --password-stdin
 
-            # Redeploy the stack from the remote compose file
+            # redeploy the stack from the host’s compose file
             docker stack deploy \
               -c /home/${{ secrets.SWARM_USER }}/docker-compose.yml \
               frontend-stack \
               --with-registry-auth
-          ENDSSH
+          EOF
