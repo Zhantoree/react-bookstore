@@ -1,91 +1,107 @@
-name: CI
+name: CI & Docker Swarm Deploy
 
+# only run on pushes to main
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [ main ]
+
+env:
+  # name of your image (without tag)
+  IMAGE_BASE: ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/frontend
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
-
-    steps:
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+    steps
+      # 1. Checkout your repo
       - name: Checkout code
         run: |
-          git clone \
-            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git \
-            $GITHUB_WORKSPACE
-          cd $GITHUB_WORKSPACE
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git \
+            "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
 
-      - name: Install nvm & Node.js v22
+      # 2. Install nvm & Node.js v22
+      - name: Install nvm and Node.js v22
         run: |
           export NVM_DIR="$RUNNER_TEMP/.nvm"
           mkdir -p "$NVM_DIR"
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh \
+            | bash
           source "$NVM_DIR/nvm.sh"
           nvm install 22
           nvm use 22
+          echo "Node $(node -v), npm $(npm -v)"
 
+      # 3. Install deps & (optional) tests
       - name: Install dependencies
         run: |
-          cd $GITHUB_WORKSPACE
+          cd "$GITHUB_WORKSPACE"
           npm ci
-
-      - name: Run tests (if present)
+      - name: Run tests if present
         run: |
-          cd $GITHUB_WORKSPACE
+          cd "$GITHUB_WORKSPACE"
           npm test --if-present
 
+      # 4. Docker login
       - name: Docker login
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" \
             | docker login ${{ secrets.DOCKER_REGISTRY }} \
+              --username ${{ secrets.DOCKER_USERNAME }} \
+              --password-stdin
+
+      # 5. Build & push your image
+      - name: Build & push Docker image
+        id: build-image
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          IMAGE="${{ env.IMAGE_BASE }}:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          # expose the full image name for the deploy job
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # only deploy on main
+    if: github.ref == 'refs/heads/main'
+    steps:
+      # 6. Prepare SSH key and known_hosts
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SWARM_HOST }} \
+            >> ~/.ssh/known_hosts
+
+      # 7. Deploy to your Swarm
+      - name: Deploy to Swarm via SSH
+        run: |
+          IMAGE="${{ needs.build.outputs.image }}"
+
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.SSH_PORT }} \
+              ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'EOF'
+            set -euo pipefail
+
+            # login on remote
+            echo "${{ secrets.DOCKER_PASSWORD }}" \
+              | docker login ${{ secrets.DOCKER_REGISTRY }} \
                 --username ${{ secrets.DOCKER_USERNAME }} \
                 --password-stdin
 
-      - name: Build & push Docker image
-        run: |
-          cd $GITHUB_WORKSPACE
-          IMAGE="${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/frontend"
-          docker build -t "$IMAGE:latest" .
-          docker tag "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
-          docker push "$IMAGE:latest"
-          docker push "$IMAGE:${{ github.sha }}"
+            echo "Pulling $IMAGE"
+            docker pull "$IMAGE"
 
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Install SSH client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y openssh-client
-
-      - name: Install SSH key
-        run: |
-          mkdir -p ~/.ssh
-          # strip CRLF and write key
-          printf "%s" "${{ secrets.SWARM_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-      - name: Deploy to Docker Swarm
-        run: |
-          ssh -o StrictHostKeyChecking=no \
-              -i ~/.ssh/id_rsa \
-              -p ${{ secrets.SWARM_SSH_PORT }} \
-              ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'EOF'
-            echo "${{ secrets.DOCKER_PASSWORD }}" \
-              | docker login ${{ secrets.DOCKER_REGISTRY }} \
-                  --username ${{ secrets.DOCKER_USERNAME }} \
-                  --password-stdin
-
-            docker stack deploy \
-              -c /home/${{ secrets.SWARM_USER }}/docker-compose.yml \
-              frontend-stack \
-              --with-registry-auth
+            # if your service already exists, update it; otherwise do first‐time stack deploy
+            if docker service inspect frontend_app >/dev/null 2>&1; then
+              echo "Updating service → frontend_app"
+              docker service update --image "$IMAGE" frontend_app
+            else
+              echo "First‐time deploy via stack"
+              docker stack deploy -c docker-compose.yml frontend
+            fi
           EOF
