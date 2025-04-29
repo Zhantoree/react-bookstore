@@ -10,8 +10,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.build-image.outputs.image }}
     steps:
       - name: Checkout code
         run: |
@@ -19,7 +17,7 @@ jobs:
             "$GITHUB_WORKSPACE"
           cd "$GITHUB_WORKSPACE"
 
-      - name: Install nvm and Node.js v22
+      - name: Install nvm & Node.js v22
         run: |
           export NVM_DIR="$RUNNER_TEMP/.nvm"
           mkdir -p "$NVM_DIR"
@@ -27,7 +25,6 @@ jobs:
           source "$NVM_DIR/nvm.sh"
           nvm install 22
           nvm use 22
-          echo "Node $(node -v), npm $(npm -v)"
 
       - name: Install dependencies
         run: |
@@ -39,67 +36,51 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           npm test --if-present
 
-      - name: Docker login
+      - name: Docker login, build & push
         run: |
+          IMAGE="${{ env.IMAGE_BASE }}:${{ github.sha }}"
           echo "${{ secrets.DOCKER_PASSWORD }}" \
             | docker login ${{ secrets.DOCKER_REGISTRY }} \
-              --username ${{ secrets.DOCKER_USERNAME }} \
-              --password-stdin
-
-      - name: Build & push Docker image
-        id: build-image
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          IMAGE="${{ env.IMAGE_BASE }}:${{ github.sha }}"
+              --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Set up SSH
+      - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          # write the private key, strip any Windows CRLFs
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           sed -i 's/\r$//' ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-          # default to port 22 if SSH_PORT is empty or invalid
-          PORT="${{ secrets.SSH_PORT }}"
-          PORT="${PORT:-22}"
-
-          ssh-keyscan -p "$PORT" ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy to Swarm via SSH
+      - name: Deploy to Swarm
         run: |
-          # expand locally before SSH
-          PORT="${{ secrets.SSH_PORT }}"
-          PORT="${PORT:-22}"
-          IMAGE="${{ needs.build.outputs.image }}"
+          # compute port & image locally
+          PORT="${{ secrets.SSH_PORT }}"; PORT="${PORT:-22}"
+          IMAGE="${{ env.IMAGE_BASE }}:${{ github.sha }}"
+
+          # add host fingerprint
+          ssh-keyscan -p "$PORT" ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
 
           ssh -i ~/.ssh/id_rsa -p "$PORT" \
             ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} <<EOF
             set -euo pipefail
 
-            # docker login on remote
+            # login on remote
             echo "${{ secrets.DOCKER_PASSWORD }}" \
               | docker login ${{ secrets.DOCKER_REGISTRY }} \
-                --username ${{ secrets.DOCKER_USERNAME }} \
-                --password-stdin
+                --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-            # pull the new image
-            docker pull "$IMAGE"
+            # pull & update or deploy
+            docker pull $IMAGE
 
-            # update existing service or first‐time deploy
             if docker service inspect frontend_app >/dev/null 2>&1; then
-              echo "Updating service → frontend_app"
-              docker service update --image "$IMAGE" frontend_app
+              docker service update --image $IMAGE frontend_app
             else
-              echo "First‐time deploy via stack"
               docker stack deploy -c docker-compose.yml frontend
             fi
           EOF
