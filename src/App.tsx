@@ -13,7 +13,7 @@ import OrderCreatePage from './pages/OrderCreatePage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import './App.scss';
 
-const { Header, Content, Footer } = Layout;
+const { Header, Content } = Layout;
 
 const App: React.FC = () => {
     return (
