@@ -58,38 +58,36 @@ jobs:
 
       - name: Deploy to Docker Swarm
         run: |
-          # Compute variables
+          # compute variables locally
           PORT="${{ secrets.SSH_PORT }}"; PORT="${PORT:-22}"
           IMAGE="${{ env.IMAGE_BASE }}:${{ github.sha }}"
-          PUBLISH_PORT="${{ secrets.FRONTEND_PUBLISH_PORT }}"; PUBLISH_PORT="${PUBLISH_PORT:-8080}"
+          PUBLISH_PORT="${{ secrets.FRONTEND_PUBLISH_PORT }}"; PUBLISH_PORT="${PUBLISH_PORT:-3000}"
 
-          # Trust the host
+          # trust the host
           ssh-keyscan -p "$PORT" ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
 
-          # SSH in and deploy
           ssh -i ~/.ssh/id_rsa -p "$PORT" \
             ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} <<EOF
             set -euo pipefail
 
-            # Login so docker pull works
+            # login so docker pull works
             echo "${{ secrets.DOCKER_PASSWORD }}" \
               | docker login ${{ secrets.DOCKER_REGISTRY }} \
                 --username ${{ secrets.DOCKER_USERNAME }} \
                 --password-stdin
 
-            # Pull the new image
             docker pull $IMAGE
 
             if docker service inspect frontend_app >/dev/null 2>&1; then
-              echo "Updating service → frontend_app"
-              docker service update --image $IMAGE frontend_app
+              echo "Updating frontend_app → $IMAGE"
+              docker service update --detach --image $IMAGE frontend_app
             else
-              echo "Creating overlay network if needed"
+              echo "Ensuring overlay network exists"
               docker network inspect frontend_webnet >/dev/null 2>&1 \
                 || docker network create -d overlay frontend_webnet
 
-              echo "Creating service → frontend_app on port $PUBLISH_PORT"
-              docker service create \
+              echo "Creating frontend_app on port $PUBLISH_PORT → 3000"
+              docker service create --detach \
                 --name frontend_app \
                 --network frontend_webnet \
                 --publish published=${PUBLISH_PORT},target=3000 \
