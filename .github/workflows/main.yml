@@ -63,33 +63,38 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          # write the private key, strip any Windows CRLFs
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          sed -i 's/\r$//' ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
           # default to port 22 if SSH_PORT is empty or invalid
           PORT="${{ secrets.SSH_PORT }}"
           PORT="${PORT:-22}"
 
-          ssh-keyscan -p $PORT ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p "$PORT" ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to Swarm via SSH
         run: |
+          # expand locally before SSH
           PORT="${{ secrets.SSH_PORT }}"
           PORT="${PORT:-22}"
           IMAGE="${{ needs.build.outputs.image }}"
 
-          ssh -i ~/.ssh/id_rsa -p $PORT \
-            ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -p "$PORT" \
+            ${{ secrets.SWARM_USER }}@${{ secrets.SWARM_HOST }} <<EOF
             set -euo pipefail
 
-            # ensure remote pulls from your registry
+            # docker login on remote
             echo "${{ secrets.DOCKER_PASSWORD }}" \
               | docker login ${{ secrets.DOCKER_REGISTRY }} \
                 --username ${{ secrets.DOCKER_USERNAME }} \
                 --password-stdin
 
+            # pull the new image
             docker pull "$IMAGE"
 
+            # update existing service or first‐time deploy
             if docker service inspect frontend_app >/dev/null 2>&1; then
               echo "Updating service → frontend_app"
               docker service update --image "$IMAGE" frontend_app
