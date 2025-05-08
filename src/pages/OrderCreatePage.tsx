@@ -53,7 +53,7 @@ const OrderCreatePage: React.FC = () => {
                     rules={[{required: true, message: 'Please select a book'}]}
                 >
                     <Select placeholder="Select a book" onSelect={(id) => setSelectedBook(books?.find(book => book?.id === id))}>
-                        {books.map((book) => (
+                        {books.map((book) => book.quantity > 0 && (
                             <Option key={book.id} value={book.id}>
                                 {book.title} (ID: {book.id})
                             </Option>

@@ -56,9 +56,17 @@ const BookList: React.FC = () => {
                 dataSource={data}
                 renderItem={(book) => (
                     <List.Item key={book.id}>
-                        <Link to={`/books/${book.id}`}>
-                            {book.title} - ${book.price.toFixed(2)}
-                        </Link>
+                        {
+                            book?.quantity > 0 ? (
+                                <Link to={`/books/${book.id}`}>
+                                    {book.title} - {book.price.toFixed(0)}$ {'     '}
+                                    {book?.quantity} left
+                                </Link>
+                            ) : (
+                                <><span style={{color: 'grey'}}>{book.title}</span> <span style={{color: 'red'}}>SOLD OUT</span></>
+                            )
+                        }
+
                     </List.Item>
                 )}
                 style={{ marginTop: '1rem' }}

@@ -9,6 +9,7 @@ export interface Book {
     id?: number;
     title: string;
     price: number;
+    quantity: number;
     // Add additional properties if needed
 }
 
