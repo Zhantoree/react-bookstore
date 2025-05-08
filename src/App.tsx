@@ -20,7 +20,7 @@ const App: React.FC = () => {
         <Router>
             <Layout>
                 <Header style={headerStyle}>
-                    <div style={titleStyle}>Bookstore</div>
+                    <div style={titleStyle}>Bookstore Almaz Zhantore</div>
                     <div style={navStyle}>
                         <Link to="/authors">
                             <Button type="link" style={linkButtonStyle}>Authors</Button>
