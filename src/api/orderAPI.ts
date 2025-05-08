@@ -25,12 +25,7 @@ export const deleteOrder = async (id: number): Promise<void> => {
     await axiosClient.delete(`/order/${id}`);
 };
 
-export const updateOrderStatus = async (
-    orderId: number,
-    event: OrderEvent
-): Promise<Order> => {
-    const response = await axiosClient.put<Order>(`/order/${orderId}/status`, null, {
-        params: { event }
-    });
+export const updateOrderStatus = async (data): Promise<Order> => {
+    const response = await axiosClient.post<Order>(`/process/order`, data);
     return response.data;
 };

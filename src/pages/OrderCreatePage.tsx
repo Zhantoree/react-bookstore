@@ -1,19 +1,20 @@
 // src/pages/OrderCreatePage.tsx
-import React from 'react';
-import { Form, Input, Button, message, Select, Spin } from 'antd';
-import { createOrder } from '../api/orderAPI';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { fetchBooks } from '../api/bookAPI';
-import { Book } from '../types';
+import React, {useState} from 'react';
+import {Form, Input, Button, message, Select, Spin, InputNumber} from 'antd';
+import {createOrder} from '../api/orderAPI';
+import {useNavigate} from 'react-router-dom';
+import {useQuery} from '@tanstack/react-query';
+import {fetchBooks} from '../api/bookAPI';
+import {Book} from '../types';
 
-const { Option } = Select;
+const {Option} = Select;
 
 const OrderCreatePage: React.FC = () => {
     const navigate = useNavigate();
+    const [selectedBook, setSelectedBook] = useState<Book | undefined>(undefined)
 
     // Fetch existing books so the user can select from valid options.
-    const { data: books, isLoading: booksLoading, error: booksError } = useQuery<Book[], Error>(
+    const {data: books, isLoading: booksLoading, error: booksError} = useQuery<Book[], Error>(
         ['books'],
         () => fetchBooks(),
         {
@@ -24,9 +25,11 @@ const OrderCreatePage: React.FC = () => {
     const onFinish = async (values: any) => {
         // Build order payload with the selected valid book ID.
         const orderData = {
-            book: { id: values.bookId },
+            book: {id: values.bookId},
             customerName: values.customerName,
+            quantity: values.quantity,
         };
+        console.log('values', values);
 
         try {
             await createOrder(orderData);
@@ -37,7 +40,7 @@ const OrderCreatePage: React.FC = () => {
         }
     };
 
-    if (booksLoading) return <Spin tip="Loading books..." />;
+    if (booksLoading) return <Spin tip="Loading books..."/>;
     if (booksError) return <div>Error loading books: {booksError.message}</div>;
 
     return (
@@ -47,9 +50,9 @@ const OrderCreatePage: React.FC = () => {
                 <Form.Item
                     name="bookId"
                     label="Select Book"
-                    rules={[{ required: true, message: 'Please select a book' }]}
+                    rules={[{required: true, message: 'Please select a book'}]}
                 >
-                    <Select placeholder="Select a book">
+                    <Select placeholder="Select a book" onSelect={(id) => setSelectedBook(books?.find(book => book?.id === id))}>
                         {books.map((book) => (
                             <Option key={book.id} value={book.id}>
                                 {book.title} (ID: {book.id})
@@ -60,9 +63,16 @@ const OrderCreatePage: React.FC = () => {
                 <Form.Item
                     name="customerName"
                     label="Customer Name"
-                    rules={[{ required: true, message: 'Customer name is required' }]}
+                    rules={[{required: true, message: 'Customer name is required'}]}
                 >
-                    <Input />
+                    <Input/>
+                </Form.Item>
+                <Form.Item
+                    name="quantity"
+                    label="Quantity"
+                    rules={[{required: true, message: 'Quantity required'}]}
+                >
+                    <InputNumber min={1} disabled={!selectedBook} max={selectedBook?.quantity || 1000}/>
                 </Form.Item>
                 <Form.Item>
                     <Button type="primary" htmlType="submit">

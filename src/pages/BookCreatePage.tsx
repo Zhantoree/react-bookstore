@@ -25,6 +25,7 @@ const BookCreatePage: React.FC = () => {
             isbn: values.isbn,
             publicationDate: values.publicationDate ? values.publicationDate.toISOString() : null,
             price: values.price,
+            quantity: values.quantity,
             genre: values.genre,
             description: values.description,
             author: { id: values.authorId }
@@ -62,21 +63,31 @@ const BookCreatePage: React.FC = () => {
                     <Input />
                 </Form.Item>
 
-                <Form.Item
-                    name="publicationDate"
-                    label="Publication Date"
-                    rules={[{ required: true, message: 'Publication date is required' }]}
-                >
-                    <DatePicker />
-                </Form.Item>
 
-                <Form.Item
-                    name="price"
-                    label="Price"
-                    rules={[{ required: true, type: 'number', message: 'Price is required' }]}
-                >
-                    <InputNumber />
-                </Form.Item>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '500px'}}>
+                    <Form.Item
+                        name="price"
+                        label="Price"
+                        rules={[{ required: true, type: 'number', message: 'Price is required' }]}
+                    >
+                        <InputNumber min={1} />
+                    </Form.Item>
+                    <Form.Item
+                        name="quantity"
+                        label="Quantity"
+                        rules={[{required: true, message: 'Quantity required'}]}
+                    >
+                        <InputNumber min={1} />
+                    </Form.Item>
+                    <Form.Item
+                        name="publicationDate"
+                        label="Publication Date"
+                        rules={[{ required: true, message: 'Publication date is required' }]}
+                    >
+                        <DatePicker />
+                    </Form.Item>
+                </div>
+
 
                 <Form.Item
                     name="genre"

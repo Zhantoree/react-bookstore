@@ -33,9 +33,17 @@ const OrderList: React.FC = () => {
         { keepPreviousData: true, retry: false }
     );
 
-    const handleStatusUpdate = async (orderId: number, event: OrderEvent) => {
+    const handleStatusUpdate = async (orderId: number, event: OrderEvent, order: Order) => {
         try {
-            await updateOrderStatus(orderId, event);
+            const updateStatusData = {
+                bookId: order.book?.id,
+                orderId: orderId,
+                event: event,
+                executorId: null,
+                description: null,
+            }
+
+            await updateOrderStatus(updateStatusData);
             refetch();
         } catch (e) {
             console.error('Error updating order status:', e);
@@ -70,7 +78,7 @@ const OrderList: React.FC = () => {
                                         <Button
                                             key={event}
                                             type="primary"
-                                            onClick={() => handleStatusUpdate(order.id!, event)}
+                                            onClick={() => handleStatusUpdate(order.id!, event, order)}
                                         >
                                             {event}
                                         </Button>
