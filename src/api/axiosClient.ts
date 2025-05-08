@@ -4,7 +4,7 @@ const axiosClient = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': 'http://138.68.103.232:80'
+        'Access-Control-Allow-Origin': 'http://139.59.156.55:80'
     }
 });
 
