@@ -78,17 +78,17 @@ jobs:
 
             docker pull $IMAGE
 
-            if docker service inspect frontend_app >/dev/null 2>&1; then
-              echo "Updating frontend_app → $IMAGE"
-              docker service update --detach --image $IMAGE frontend_app
+            if docker service inspect bookstore_frontend >/dev/null 2>&1; then
+              echo "Updating bookstore_frontend → $IMAGE"
+              docker service update --detach --image $IMAGE bookstore_frontend
             else
               echo "Ensuring overlay network exists"
               docker network inspect frontend_webnet >/dev/null 2>&1 \
                 || docker network create -d overlay frontend_webnet
 
-              echo "Creating frontend_app on port $PUBLISH_PORT → 3000"
+              echo "Creating bookstore_frontend on port $PUBLISH_PORT → 3000"
               docker service create --detach \
-                --name frontend_app \
+                --name bookstore_frontend \
                 --network frontend_webnet \
                 --publish published=${PUBLISH_PORT},target=3000 \
                 $IMAGE
