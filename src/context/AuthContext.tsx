@@ -1,8 +1,8 @@
 import {createContext} from 'react';
-import {AuthState} from '../types/auth';
+import {AuthState, User} from '../types/auth';
 
 interface AuthContextType extends AuthState {
-    login: (token: string, role: 'ADMIN' | 'USER') => void;
+    login: (token: string, user: User) => void;
     logout: () => void;
     isAdmin: () => boolean;
 }

@@ -12,7 +12,12 @@ const LoginPage: React.FC = () => {
     const onFinish = async (values: LoginCredentials) => {
         try {
             const response = await login(values);
-            authLogin(response.token, response.role);
+            authLogin(response.token, {
+                username: response?.username,
+                role: response?.role,
+                email: response?.email,
+                id: response?.userId,
+            });
             message.success('Login successful!');
             navigate('/');
         } catch (error) {

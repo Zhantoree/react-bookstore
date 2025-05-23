@@ -1,7 +1,7 @@
 import React from 'react';
 import {List, Button, Spin, Alert, Space, Typography} from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { fetchOrders, updateOrderStatus } from '../api/orderAPI';
+import {fetchOrders, fetchOrdersByUserId, updateOrderStatus} from '../api/orderAPI';
 import { Order, OrderEvent, OrderStatus } from '../types';
 import styles from './OrderList.module.scss';
 import {Link, useNavigate} from 'react-router-dom';
@@ -26,12 +26,12 @@ const getAvailableEvents = (status: OrderStatus): OrderEvent[] => {
 };
 
 const OrderList: React.FC = () => {
+    const { isAdmin, user } = useAuth()
     const { data, isLoading, error, refetch } = useQuery<Order[], Error>(
         ['orders'],
-        () => fetchOrders(),
-        { keepPreviousData: true, retry: false }
+        () => isAdmin() ? fetchOrders() : fetchOrdersByUserId(user?.id),
+        {  retry: false }
     );
-    const { isAdmin } = useAuth();
 
 
     const handleStatusUpdate = async (orderId: number, event: OrderEvent, order: Order) => {
@@ -53,7 +53,7 @@ const OrderList: React.FC = () => {
 
     if (isLoading) return <Spin tip="Loading orders..." />;
     if (error && error?.status !== 404) return <Alert message="Error fetching orders" type="error" />;
-
+    console.log('data', data)
     return (
         <div className={styles.orderList}>
             <div style={{ marginBottom: '1rem' }}>

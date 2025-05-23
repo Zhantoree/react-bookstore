@@ -30,13 +30,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({children}) => {
         }
     }, [authState.token]);
 
-    const login = (token: string, role: 'ADMIN' | 'USER') => {
+    const login = (token: string, user: User) => {
         // Create a basic user object from the token and role
-        const user: User = {
-            username: 'user', // This would typically come from decoding the JWT
-            email: 'user@example.com', // This would typically come from decoding the JWT
-            role: role
-        };
 
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));

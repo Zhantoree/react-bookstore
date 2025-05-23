@@ -6,6 +6,7 @@ import { Form, Input, DatePicker, Select, Button, Spin, message } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import moment from 'moment';
 import { Order } from '../types';
+import {useAuth} from "../hooks/useAuth";
 
 const { Option } = Select;
 
@@ -13,6 +14,7 @@ const OrderDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const { data: order, isLoading } = useQuery<Order, Error>(
         ['order', id],
@@ -77,7 +79,7 @@ const OrderDetailPage: React.FC = () => {
                     label="Customer Name"
                     rules={[{ required: true, message: 'Customer name is required' }]}
                 >
-                    <Input />
+                    <Input disabled defaultValue={user?.username} />
                 </Form.Item>
                 <Form.Item
                     name="orderDate"

@@ -6,12 +6,14 @@ import {useLocation, useNavigate} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
 import {fetchBooks} from '../api/bookAPI';
 import {Book} from '../types';
+import {useAuth} from "../hooks/useAuth";
 
 const {Option} = Select;
 
 const OrderCreatePage: React.FC = () => {
     const navigate = useNavigate();
     const {state} = useLocation();
+    const { user } = useAuth();
 
     const [selectedBook, setSelectedBook] = useState<Book | undefined>(state?.book || undefined)
 
@@ -31,8 +33,9 @@ const OrderCreatePage: React.FC = () => {
         // Build order payload with the selected valid book ID.
         const orderData = {
             book: {id: values.bookId},
-            customerName: values.customerName,
+            customerName: user?.username,
             quantity: values.quantity,
+            userId: user?.id
         };
 
         try {
@@ -50,7 +53,11 @@ const OrderCreatePage: React.FC = () => {
     return (
         <div>
             <h2>Create Order</h2>
-            <Form onFinish={onFinish} layout="vertical">
+            <Form onFinish={onFinish} layout="vertical" defaultValue={{
+                bookId: '',
+                customerName: user?.username,
+                quantity: 1,
+            }}>
                 <Form.Item
                     name="bookId"
                     label="Select Book"
@@ -67,9 +74,8 @@ const OrderCreatePage: React.FC = () => {
                 <Form.Item
                     name="customerName"
                     label="Customer Name"
-                    rules={[{required: true, message: 'Customer name is required'}]}
                 >
-                    <Input/>
+                    <Input disabled defaultValue={user?.username}/>
                 </Form.Item>
                 <Form.Item
                     name="quantity"

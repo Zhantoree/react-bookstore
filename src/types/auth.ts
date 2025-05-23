@@ -2,6 +2,7 @@ export interface User {
     username: string;
     email: string;
     role: 'ADMIN' | 'USER';
+    id: number;
 }
 
 export interface AuthState {
@@ -21,7 +22,6 @@ export interface RegisterCredentials {
     password: string;
 }
 
-export interface AuthResponse {
+export interface AuthResponse extends User{
     token: string;
-    role: 'ADMIN' | 'USER';
 }
