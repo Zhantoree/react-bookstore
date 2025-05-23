@@ -1,13 +1,12 @@
-// src/components/OrderList.tsx
 import React from 'react';
-import { List, Button, Spin, Alert, Space } from 'antd';
+import {List, Button, Spin, Alert, Space, Typography} from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOrders, updateOrderStatus } from '../api/orderAPI';
 import { Order, OrderEvent, OrderStatus } from '../types';
 import styles from './OrderList.module.scss';
-import { Link } from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
+import {useAuth} from "../hooks/useAuth";
 
-// Helper: Determine available events based on current order status.
 const getAvailableEvents = (status: OrderStatus): OrderEvent[] => {
     switch (status) {
         case OrderStatus.NEW:
@@ -32,6 +31,8 @@ const OrderList: React.FC = () => {
         () => fetchOrders(),
         { keepPreviousData: true, retry: false }
     );
+    const { isAdmin } = useAuth();
+
 
     const handleStatusUpdate = async (orderId: number, event: OrderEvent, order: Order) => {
         try {
@@ -68,23 +69,35 @@ const OrderList: React.FC = () => {
                     return (
                         <List.Item key={order.id}>
                             <div>
-                                <Link to={`/orders/${order.id}`}>
-                                    Order #{order.id} - {order.orderDate} - Status: {order.status}
-                                </Link>
+                                {
+                                    isAdmin() ? (
+                                        <Link to={`/orders/${order.id}`}>
+                                            Order #{order.id} - {order.orderDate} - Status: {order.status}
+                                        </Link>
+                                    ) : (
+                                        <>
+                                            Order #{order.id} - {order.orderDate} - <Typography.Text style={{color: '#1677ff'}}>Status: {order.status}</Typography.Text>
+                                        </>
+                                    )
+                                }
                             </div>
-                            <div>
-                                <Space>
-                                    {availableEvents.map((event) => (
-                                        <Button
-                                            key={event}
-                                            type="primary"
-                                            onClick={() => handleStatusUpdate(order.id!, event, order)}
-                                        >
-                                            {event}
-                                        </Button>
-                                    ))}
-                                </Space>
-                            </div>
+                            {
+                                isAdmin() && (
+                                    <div>
+                                        <Space>
+                                            {availableEvents.map((event) => (
+                                                <Button
+                                                    key={event}
+                                                    type="primary"
+                                                    onClick={() => handleStatusUpdate(order.id!, event, order)}
+                                                >
+                                                    {event}
+                                                </Button>
+                                            ))}
+                                        </Space>
+                                    </div>
+                                )
+                            }
                         </List.Item>
                     );
                 }}

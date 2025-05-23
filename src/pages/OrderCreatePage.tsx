@@ -2,7 +2,7 @@
 import React, {useState} from 'react';
 import {Form, Input, Button, message, Select, Spin, InputNumber} from 'antd';
 import {createOrder} from '../api/orderAPI';
-import {useNavigate} from 'react-router-dom';
+import {useLocation, useNavigate} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
 import {fetchBooks} from '../api/bookAPI';
 import {Book} from '../types';
@@ -11,7 +11,12 @@ const {Option} = Select;
 
 const OrderCreatePage: React.FC = () => {
     const navigate = useNavigate();
-    const [selectedBook, setSelectedBook] = useState<Book | undefined>(undefined)
+    const {state} = useLocation();
+
+    const [selectedBook, setSelectedBook] = useState<Book | undefined>(state?.book || undefined)
+
+    console.log('state?.book', state?.book)
+    console.log('selectedBook', selectedBook)
 
     // Fetch existing books so the user can select from valid options.
     const {data: books, isLoading: booksLoading, error: booksError} = useQuery<Book[], Error>(
@@ -29,7 +34,6 @@ const OrderCreatePage: React.FC = () => {
             customerName: values.customerName,
             quantity: values.quantity,
         };
-        console.log('values', values);
 
         try {
             await createOrder(orderData);
@@ -52,7 +56,7 @@ const OrderCreatePage: React.FC = () => {
                     label="Select Book"
                     rules={[{required: true, message: 'Please select a book'}]}
                 >
-                    <Select placeholder="Select a book" onSelect={(id) => setSelectedBook(books?.find(book => book?.id === id))}>
+                    <Select defaultValue={selectedBook?.id} placeholder="Select a book" onSelect={(id) => setSelectedBook(books?.find(book => book?.id === id))}>
                         {books.map((book) => book.quantity > 0 && (
                             <Option key={book.id} value={book.id}>
                                 {book.title} (ID: {book.id})

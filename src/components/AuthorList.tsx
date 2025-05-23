@@ -20,7 +20,6 @@ const AuthorList: React.FC = () => {
         }
     );
 
-    console.log('data', data);
     const handleSearch = (value: string) => {
         setLastName(value);
         refetch();
